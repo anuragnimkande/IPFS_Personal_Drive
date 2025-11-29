@@ -1,0 +1,66 @@
+<!-- templates/login.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% block styles %}
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/auth.css') }}"
+    />
+    {% endblock %}
+  </head>
+
+  {% extends 'base.html' %} {% block content %}
+  <div class="auth-container">
+    <div class="auth-box">
+      <div class="auth-header">
+        <h1><i class="fa-solid fa-right-to-bracket"></i> Login</h1>
+        <p>Access your Personal Drive</p>
+      </div>
+
+      {% if error %}
+      <div class="error-message">
+        <i class="fa-solid fa-exclamation-circle"></i> {{ error }}
+      </div>
+      {% endif %}
+
+      <form method="post" class="auth-form">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            placeholder="Enter your username"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Enter your password"
+            required
+          />
+        </div>
+
+        <button type="submit" class="btn">
+          <i class="fa-solid fa-right-to-bracket"></i> Login
+        </button>
+      </form>
+
+      <div class="auth-actions">
+        <a href="/register" class="btn btn-secondary">
+          <i class="fa-solid fa-user-plus"></i> Register
+        </a>
+        <a href="/" class="btn btn-secondary">
+          <i class="fa-solid fa-home"></i> Home
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endblock %}
+</html>

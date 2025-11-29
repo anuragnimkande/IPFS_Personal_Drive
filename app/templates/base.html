@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Personal Drive{% endblock %}</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/base.css') }}"
+    />
+    {% block styles %}{% endblock %}
+  </head>
+  <body>
+    {% if session.username %}
+    <div class="header">
+      <h1><i class="fa-solid fa-cloud"></i> Personal Drive</h1>
+      <div class="user-info">
+        <span>Welcome, <strong>{{ session.username }}</strong></span>
+        <a href="/logout" class="logout-btn">
+          <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </a>
+      </div>
+    </div>
+    {% endif %} {% block content %}{% endblock %}
+
+    <footer>
+      <i class="fa-solid fa-lock"></i> Secure File Storage via IPFS & Pinata |
+      Developed by <strong>Alchemists</strong>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div class="overlay" id="loadingOverlay">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loadingText">Processing... Please wait</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="{{ url_for('static', filename='js/drive.js') }}"></script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

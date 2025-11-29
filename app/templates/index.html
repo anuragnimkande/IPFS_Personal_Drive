@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% block styles %}
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/dashboard.css') }}"
+    />
+    {% endblock %}
+  </head>
+
+  {% extends 'base.html' %} {% block content %}
+  <div class="landing-container">
+    <!-- Left section -->
+    <div class="landing-info">
+      <h1><i class="fa-solid fa-cloud"></i> Personal Drive</h1>
+      <p>
+        Your private and secure IPFS-based storage system. Upload, download, and
+        manage your personal or professional files with decentralized storage
+        technology. All files are encrypted and permanently stored on the
+        InterPlanetary File System.
+      </p>
+
+      <div class="btn-group">
+        {% if session.username %}
+        <a href="/drive" class="btn">
+          <i class="fa-solid fa-hard-drive"></i> My Drive
+        </a>
+        {% else %}
+        <a href="/login" class="btn">
+          <i class="fa-solid fa-right-to-bracket"></i> Login
+        </a>
+        <a href="/register" class="btn btn-secondary">
+          <i class="fa-solid fa-user-plus"></i> Register
+        </a>
+        {% endif %}
+      </div>
+
+      <!-- How to Use Button -->
+      <button
+        id="howToUseBtn"
+        class="btn btn-secondary"
+        style="margin-top: 15px"
+      >
+        <i class="fa-solid fa-circle-info"></i> How to Use
+      </button>
+    </div>
+
+    <!-- Right section -->
+    <div class="landing-visual">
+      <img
+        src="https://cdn-icons-png.flaticon.com/512/2933/2933245.png"
+        alt="Personal Drive"
+      />
+      <div class="features">
+        <div class="feature-card">
+          <i class="fa-solid fa-shield-halved"></i>
+          <p>Secure</p>
+        </div>
+        <div class="feature-card">
+          <i class="fa-solid fa-cloud-upload-alt"></i>
+          <p>Upload</p>
+        </div>
+        <div class="feature-card">
+          <i class="fa-solid fa-download"></i>
+          <p>Download</p>
+        </div>
+        <div class="feature-card">
+          <i class="fa-solid fa-infinity"></i>
+          <p>Permanent</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- How to Use Modal -->
+  <div id="howToUseModal" class="modal">
+    <div class="modal-content">
+      <span class="close-modal">&times;</span>
+      <h2 style="color: #f9d71c; margin-bottom: 15px">
+        <i class="fa-solid fa-info-circle"></i> How to Use Personal Drive
+      </h2>
+      <ul style="line-height: 1.8; padding-left: 20px">
+        <li style="margin-bottom: 10px">
+          <strong>Register/Login:</strong> Create an account or login to access
+          your personal drive.
+        </li>
+        <li style="margin-bottom: 10px">
+          <strong>Upload Files:</strong> Drag and drop or click to upload files
+          to IPFS decentralized storage.
+        </li>
+        <li style="margin-bottom: 10px">
+          <strong>Preview Files:</strong> View images, PDFs, text files directly
+          in your browser.
+        </li>
+        <li style="margin-bottom: 10px">
+          <strong>Download Files:</strong> Download your files anytime from any
+          device.
+        </li>
+        <li style="margin-bottom: 10px">
+          <strong>Secure Storage:</strong> All files are encrypted and stored
+          permanently on IPFS.
+        </li>
+        <li>
+          <strong>Share Files:</strong> Use the unique CID to share files with
+          others.
+        </li>
+      </ul>
+    </div>
+  </div>
+  {% endblock %} {% block scripts %}
+  <script>
+    const modal = document.getElementById("howToUseModal");
+    const btn = document.getElementById("howToUseBtn");
+    const close = document.querySelector(".close-modal");
+
+    if (btn) btn.onclick = () => (modal.style.display = "flex");
+    if (close) close.onclick = () => (modal.style.display = "none");
+    window.onclick = (e) => {
+      if (e.target === modal) modal.style.display = "none";
+    };
+  </script>
+  {% endblock %}
+</html>

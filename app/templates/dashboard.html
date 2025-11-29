@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% block styles %}
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/drive.css') }}"
+    />
+    {% endblock %}
+  </head>
+
+  {% extends 'base.html' %} {% block content %}
+  <div class="container">
+    <!-- Upload Section -->
+    <div class="upload-section">
+      <div class="upload-area" id="uploadArea">
+        <i class="fa-solid fa-cloud-arrow-up"></i>
+        <h3>Upload to Personal Drive</h3>
+        <p>Drag & drop files here or click to browse</p>
+        <p style="font-size: 0.8rem; margin-top: 10px; color: #94a0c1">
+          Supported: Images, PDFs, Documents, Videos, and more
+        </p>
+      </div>
+
+      <input type="file" id="fileInput" />
+
+      <div class="file-preview" id="filePreview" style="display: none">
+        <p><strong>Local Preview:</strong></p>
+        <div class="preview-content" id="localPreviewContent"></div>
+      </div>
+
+      <button class="btn" id="uploadButton" disabled>
+        <i class="fa-solid fa-upload"></i> Upload to IPFS
+      </button>
+
+      <div
+        id="uploadMessage"
+        class="upload-message"
+        style="display: none"
+      ></div>
+    </div>
+
+    <!-- Files Section -->
+    <div class="files-section">
+      <div class="files-header">
+        <h2><i class="fa-solid fa-files"></i> Your Files</h2>
+        <div class="file-count" id="fileCount">
+          <i class="fa-solid fa-hard-drive"></i>
+          <span id="fileCountText">
+            {% if files %} {{ files|length }} file{% if files|length != 1 %}s{%
+            endif %} {% else %} Loading... {% endif %}
+          </span>
+        </div>
+      </div>
+
+      <!-- File Filters -->
+      <div class="file-filters">
+        <div class="filter-group">
+          <input
+            type="text"
+            id="fileSearch"
+            class="file-search"
+            placeholder="Search files..."
+          />
+          <i class="fa-solid fa-search search-icon"></i>
+        </div>
+
+        <select id="fileTypeFilter" class="file-filter">
+          <option value="all">All File Types</option>
+          <option value="image">Images</option>
+          <option value="pdf">PDFs</option>
+          <option value="text">Text Files</option>
+          <option value="video">Videos</option>
+          <option value="audio">Audio</option>
+          <option value="other">Other</option>
+        </select>
+
+        <select id="sortBy" class="file-filter">
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="name_asc">Name A-Z</option>
+          <option value="name_desc">Name Z-A</option>
+        </select>
+      </div>
+
+      {% if files and files|length > 0 %}
+      <div class="files-table-container">
+        <table class="files-table" id="filesTable">
+          <thead>
+            <tr>
+              <th class="file-name-header">Name</th>
+              <th class="file-type-header">Type</th>
+              <th class="file-date-header">Uploaded</th>
+              <th class="file-actions-header">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="filesTableBody">
+            {% for file in files %}
+            <tr
+              class="file-row"
+              data-filetype="{{ 
+              'image' if file.content_type and file.content_type.startswith('image/') else
+              'pdf' if file.content_type and 'pdf' in file.content_type else
+              'text' if file.content_type and file.content_type.startswith('text/') else
+              'video' if file.content_type and file.content_type.startswith('video/') else
+              'audio' if file.content_type and file.content_type.startswith('audio/') else
+              'other'
+            }}"
+            >
+              <td class="file-name-cell">
+                <div class="file-name-with-icon">
+                  <i
+                    class="fa-solid {{
+                    'fa-image' if file.content_type and file.content_type.startswith('image/') else
+                    'fa-file-pdf' if file.content_type and 'pdf' in file.content_type else
+                    'fa-file-lines' if file.content_type and file.content_type.startswith('text/') else
+                    'fa-file-video' if file.content_type and file.content_type.startswith('video/') else
+                    'fa-file-audio' if file.content_type and file.content_type.startswith('audio/') else
+                    'fa-file'
+                  }} file-icon-small"
+                  ></i>
+                  <span class="file-name-text" title="{{ file.filename }}">
+                    {{ file.filename or 'Unnamed File' }}
+                  </span>
+                </div>
+              </td>
+              <td class="file-type-cell">
+                <span
+                  class="file-type-badge {{
+                  'image' if file.content_type and file.content_type.startswith('image/') else
+                  'pdf' if file.content_type and 'pdf' in file.content_type else
+                  'text' if file.content_type and file.content_type.startswith('text/') else
+                  'video' if file.content_type and file.content_type.startswith('video/') else
+                  'audio' if file.content_type and file.content_type.startswith('audio/') else
+                  'other'
+                }}"
+                >
+                  {{ 'Image' if file.content_type and
+                  file.content_type.startswith('image/') else 'PDF' if
+                  file.content_type and 'pdf' in file.content_type else 'Text'
+                  if file.content_type and file.content_type.startswith('text/')
+                  else 'Video' if file.content_type and
+                  file.content_type.startswith('video/') else 'Audio' if
+                  file.content_type and file.content_type.startswith('audio/')
+                  else file.content_type.split('/')[-1].title() if
+                  file.content_type and '/' in file.content_type else 'File' }}
+                </span>
+              </td>
+              <td class="file-date-cell">
+                {{ file.uploaded_at.strftime('%Y-%m-%d %H:%M') }}
+              </td>
+              <td class="file-actions-cell">
+                <div class="file-actions">
+                  <button
+                    class="action-btn preview-btn"
+                    data-id="{{ file.id }}"
+                    data-filename="{{ file.filename }}"
+                    title="Preview"
+                  >
+                    <i class="fa-solid fa-eye"></i>
+                  </button>
+                  <a
+                    class="action-btn"
+                    href="/download/{{ file.id }}"
+                    target="_blank"
+                    title="Download"
+                  >
+                    <i class="fa-solid fa-download"></i>
+                  </a>
+                  <button
+                    class="action-btn delete-btn"
+                    data-id="{{ file.id }}"
+                    data-filename="{{ file.filename }}"
+                    title="Delete"
+                  >
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <!-- Pagination -->
+        <div
+          class="pagination-container"
+          id="paginationContainer"
+          style="display: none"
+        >
+          <div class="pagination-info" id="paginationInfo"></div>
+          <div class="pagination-controls">
+            <button id="prevPage" class="pagination-btn" disabled>
+              <i class="fa-solid fa-chevron-left"></i> Previous
+            </button>
+            <span class="pagination-numbers" id="paginationNumbers"></span>
+            <button id="nextPage" class="pagination-btn">
+              Next <i class="fa-solid fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <i class="fa-solid fa-cloud"></i>
+        <h3>Your drive is empty</h3>
+        <p>Upload your first file to get started!</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Preview Section -->
+    <div class="preview-section">
+      <h2><i class="fa-solid fa-eye"></i> Preview Files</h2>
+      <div class="file-select-group">
+        <select id="fileSelect" class="file-select">
+          <option value="">Select a file to preview...</option>
+          {% for file in files %}
+          <option value="{{ file.id }}" data-filename="{{ file.filename }}">
+            {{ file.filename }}
+          </option>
+          {% endfor %}
+        </select>
+        <button id="previewBtn" class="btn">
+          <i class="fa-solid fa-search"></i> Preview File
+        </button>
+      </div>
+
+      <div class="preview-area">
+        <div id="previewInfo" class="preview-info">
+          <i class="fa-solid fa-info-circle"></i> Select a file to preview
+        </div>
+        <div id="previewContent" class="preview-content">
+          <div id="previewPlaceholder" class="preview-placeholder">
+            <i class="fa-solid fa-file"></i>
+            <p>File preview will appear here</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- File Details Section -->
+      <div id="previewDetails" class="preview-details" style="display: none">
+        <h4>File Details</h4>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Filename:</span>
+            <span id="detailFilename" class="detail-value">-</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Content Type:</span>
+            <span id="detailType" class="detail-value">-</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">File ID:</span>
+            <span id="detailFileId" class="detail-value">-</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Uploaded:</span>
+            <span id="detailUploaded" class="detail-value">-</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="downloadLink" class="download-link"></div>
+    </div>
+  </div>
+  {% endblock %} {% block scripts %}
+  <script>
+    // =============================================
+    // UTILITY FUNCTIONS
+    // =============================================
+    function escapeHtml(s) {
+      return String(s).replace(
+        /[&<>"']/g,
+        (m) =>
+          ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          }[m])
+      );
+    }
+
+    async function apiJson(url, opts = {}) {
+      opts.credentials = opts.credentials || "same-origin";
+      const r = await fetch(url, opts);
+      let j = null;
+      try {
+        j = await r.json();
+      } catch (e) {
+        /* non-json response */
+      }
+      return { ok: r.ok, status: r.status, json: j, resp: r };
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes === 0) return "0 Bytes";
+      const k = 1024;
+      const sizes = ["Bytes", "KB", "MB", "GB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    }
+
+    // =============================================
+    // FILE FILTERING AND PAGINATION
+    // =============================================
+    let currentPage = 1;
+    const itemsPerPage = 10;
+    let allFiles = [];
+
+    function initializeFileTable() {
+      // Store all files data
+      allFiles = Array.from(document.querySelectorAll(".file-row")).map(
+        (row) => ({
+          element: row,
+          name: row.querySelector(".file-name-text").textContent.toLowerCase(),
+          type: row.dataset.filetype,
+          date: new Date(row.querySelector(".file-date-cell").textContent),
+        })
+      );
+
+      // Add event listeners for filters
+      const searchInput = document.getElementById("fileSearch");
+      const typeFilter = document.getElementById("fileTypeFilter");
+      const sortBy = document.getElementById("sortBy");
+
+      if (searchInput) {
+        searchInput.addEventListener("input", applyFilters);
+      }
+      if (typeFilter) {
+        typeFilter.addEventListener("change", applyFilters);
+      }
+      if (sortBy) {
+        sortBy.addEventListener("change", applyFilters);
+      }
+
+      // Initialize pagination
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const searchTerm = document
+        .getElementById("fileSearch")
+        .value.toLowerCase();
+      const fileType = document.getElementById("fileTypeFilter").value;
+      const sortBy = document.getElementById("sortBy").value;
+
+      let filteredFiles = allFiles.filter((file) => {
+        const matchesSearch = file.name.includes(searchTerm);
+        const matchesType = fileType === "all" || file.type === fileType;
+        return matchesSearch && matchesType;
+      });
+
+      // Sort files
+      filteredFiles.sort((a, b) => {
+        switch (sortBy) {
+          case "newest":
+            return b.date - a.date;
+          case "oldest":
+            return a.date - b.date;
+          case "name_asc":
+            return a.name.localeCompare(b.name);
+          case "name_desc":
+            return b.name.localeCompare(a.name);
+          default:
+            return 0;
+        }
+      });
+
+      // Update file count
+      updateFileCount(filteredFiles.length);
+
+      // Show/hide pagination based on file count
+      const paginationContainer = document.getElementById(
+        "paginationContainer"
+      );
+      if (filteredFiles.length > itemsPerPage) {
+        paginationContainer.style.display = "block";
+        setupPagination(filteredFiles);
+      } else {
+        paginationContainer.style.display = "none";
+        displayFiles(filteredFiles);
+      }
+    }
+
+    function displayFiles(files) {
+      const tbody = document.getElementById("filesTableBody");
+      if (!tbody) return;
+
+      // Hide all files first
+      allFiles.forEach((file) => (file.element.style.display = "none"));
+
+      // Show filtered files
+      files.forEach((file) => (file.element.style.display = ""));
+    }
+
+    function setupPagination(filteredFiles) {
+      const totalPages = Math.ceil(filteredFiles.length / itemsPerPage);
+      currentPage = Math.min(currentPage, totalPages);
+
+      // Calculate start and end index
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = Math.min(
+        startIndex + itemsPerPage,
+        filteredFiles.length
+      );
+
+      // Display current page files
+      const pageFiles = filteredFiles.slice(startIndex, endIndex);
+      displayFiles(pageFiles);
+
+      // Update pagination info
+      const paginationInfo = document.getElementById("paginationInfo");
+      const paginationNumbers = document.getElementById("paginationNumbers");
+      const prevBtn = document.getElementById("prevPage");
+      const nextBtn = document.getElementById("nextPage");
+
+      paginationInfo.textContent = `Showing ${startIndex + 1}-${endIndex} of ${
+        filteredFiles.length
+      } files`;
+
+      // Generate page numbers
+      let pageNumbers = "";
+      for (let i = 1; i <= totalPages; i++) {
+        if (i === currentPage) {
+          pageNumbers += `<span class="page-number current">${i}</span>`;
+        } else {
+          pageNumbers += `<button class="page-number" onclick="goToPage(${i})">${i}</button>`;
+        }
+      }
+      paginationNumbers.innerHTML = pageNumbers;
+
+      // Update button states
+      prevBtn.disabled = currentPage === 1;
+      nextBtn.disabled = currentPage === totalPages;
+
+      // Add event listeners
+      prevBtn.onclick = () => goToPage(currentPage - 1);
+      nextBtn.onclick = () => goToPage(currentPage + 1);
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      applyFilters();
+    }
+
+    function updateFileCount(count) {
+      const countText = `${count} file${count === 1 ? "" : "s"}`;
+      document.getElementById("fileCountText").textContent = countText;
+    }
+
+    // =============================================
+    // FILE COUNT & MESSAGES
+    // =============================================
+    function showUploadSuccess() {
+      const msgEl = document.getElementById("uploadMessage");
+      msgEl.innerHTML = `<i class="fa-solid fa-check"></i> Upload successful!`;
+      msgEl.className = "upload-message success";
+      msgEl.style.display = "block";
+    }
+
+    function showUploadError(error) {
+      const msgEl = document.getElementById("uploadMessage");
+      msgEl.innerHTML = `<i class="fa-solid fa-times"></i> Upload failed: ${escapeHtml(
+        error
+      )}`;
+      msgEl.className = "upload-message error";
+      msgEl.style.display = "block";
+    }
+
+    // =============================================
+    // LOCAL FILE PREVIEW (Before Upload)
+    // =============================================
+    function previewLocalFile(file, previewContainer) {
+      const name = file.name.toLowerCase();
+      const reader = new FileReader();
+
+      if (name.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/)) {
+        reader.onload = (e) =>
+          (previewContainer.innerHTML = `<img src="${e.target.result}" style="max-width:100%; max-height:300px; border-radius:8px;">`);
+        reader.readAsDataURL(file);
+      } else if (name.endsWith(".pdf")) {
+        reader.onload = (e) =>
+          (previewContainer.innerHTML = `<iframe src="${e.target.result}" style="width:100%;height:300px;border:none; border-radius:8px;"></iframe>`);
+        reader.readAsDataURL(file);
+      } else if (name.match(/\.(txt|csv|json|log|py|html|js|css|md)$/)) {
+        reader.onload = (e) =>
+          (previewContainer.innerHTML = `
+                    <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:8px; max-height:300px; overflow:auto;">
+                        <pre style="white-space:pre-wrap; margin:0; color:#e0e6f0; font-size:0.9rem;">${escapeHtml(
+                          e.target.result
+                        )}</pre>
+                    </div>
+                `);
+        reader.readAsText(file);
+      } else if (name.match(/\.(mp4|webm|ogg)$/)) {
+        reader.onload = (e) =>
+          (previewContainer.innerHTML = `
+                    <video controls style="max-width:100%; max-height:300px; border-radius:8px;">
+                        <source src="${e.target.result}" type="${file.type}">
+                        Your browser does not support the video tag.
+                    </video>
+                `);
+        reader.readAsDataURL(file);
+      } else if (name.match(/\.(mp3|wav|ogg)$/)) {
+        reader.onload = (e) =>
+          (previewContainer.innerHTML = `
+                    <audio controls style="width:100%; margin:20px 0;">
+                        <source src="${e.target.result}" type="${file.type}">
+                        Your browser does not support the audio tag.
+                    </audio>
+                `);
+        reader.readAsDataURL(file);
+      } else {
+        previewContainer.innerHTML = `
+                <div style="text-align:center; padding:20px;">
+                    <i class="fa-solid fa-file" style="font-size:3rem; color:#f9d71c; margin-bottom:10px;"></i>
+                    <p>Preview not available for this file type</p>
+                    <p style="font-size:0.8rem; color:#94a0c1;">File: ${
+                      file.name
+                    }</p>
+                    <p style="font-size:0.7rem; color:#94a0c1;">Type: ${
+                      file.type || "unknown"
+                    }</p>
+                    <p style="font-size:0.7rem; color:#94a0c1;">Size: ${formatFileSize(
+                      file.size
+                    )}</p>
+                </div>
+            `;
+      }
+    }
+
+    // =============================================
+    // IPFS FILE PREVIEW (After Upload - INTERNAL CID HANDLING)
+    // =============================================
+    function showPreviewLoading(filename = "") {
+      const previewInfo = document.getElementById("previewInfo");
+      const previewContent = document.getElementById("previewContent");
+      const downloadLink = document.getElementById("downloadLink");
+      const previewDetails = document.getElementById("previewDetails");
+      const previewPlaceholder = document.getElementById("previewPlaceholder");
+
+      if (previewPlaceholder) previewPlaceholder.style.display = "none";
+      previewInfo.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Loading preview${
+        filename ? `: ${filename}` : ""
+      }...`;
+      previewContent.innerHTML = `
+            <div class="preview-loading">
+                <div class="loading-spinner"></div>
+                <p>Loading file preview...</p>
+            </div>
+        `;
+      downloadLink.innerHTML = "";
+      previewDetails.style.display = "none";
+    }
+
+    function showPreviewError(message) {
+      const previewInfo = document.getElementById("previewInfo");
+      const previewContent = document.getElementById("previewContent");
+
+      previewInfo.innerHTML = `<i class="fa-solid fa-exclamation-triangle"></i> Preview Error`;
+      previewContent.innerHTML = `
+            <div class="preview-error">
+                <i class="fa-solid fa-times-circle"></i>
+                <h4>Failed to load preview</h4>
+                <p>${escapeHtml(message)}</p>
+                <div class="error-actions">
+                    <button class="btn btn-secondary" onclick="retryLastPreview()">
+                        <i class="fa-solid fa-refresh"></i> Retry
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function hidePreviewLoading() {
+      const loadingElements = document.querySelectorAll(
+        ".preview-loading, .image-loading"
+      );
+      loadingElements.forEach((el) => (el.style.display = "none"));
+    }
+
+    // Store last preview for retry functionality
+    let lastPreviewFileId = null;
+
+    // Main preview function - uses file ID only
+    async function previewFile(fileId, filename = "") {
+      if (!fileId) {
+        showPreviewError("No file selected");
+        return;
+      }
+
+      // Store for retry functionality
+      lastPreviewFileId = fileId;
+
+      showPreviewLoading(filename);
+
+      try {
+        await previewFileByID(fileId, filename);
+      } catch (err) {
+        console.error("Preview error:", err);
+        showPreviewError(err.message);
+      }
+    }
+
+    // Preview file using internal file ID
+    async function previewFileByID(fileId, filename) {
+      const res = await apiJson(`/preview_content/${fileId}`, {
+        method: "GET",
+      });
+      if (!res.ok) throw new Error(res.json?.error || "Failed to load preview");
+
+      const info = res.json;
+      let previewHTML = "";
+
+      if (info.type === "text") {
+        previewHTML = `
+                <div class="preview-text-container">
+                    <pre class="preview-text">${escapeHtml(info.content)}</pre>
+                </div>
+            `;
+        hidePreviewLoading();
+      } else if (info.type === "binary") {
+        previewHTML = `
+                <div class="preview-iframe-container">
+                    <iframe src="${info.url}"
+                            class="preview-iframe"
+                            onload="hidePreviewLoading()"
+                            onerror="handlePreviewError('Failed to load file')">
+                    </iframe>
+                    <div class="preview-fallback">Loading file from IPFS...</div>
+                </div>
+            `;
+      } else {
+        throw new Error("Unknown preview type");
+      }
+
+      document.getElementById("previewContent").innerHTML = previewHTML;
+      updateFileDetails(info, filename, fileId);
+    }
+
+    // Update file details without revealing CID
+    function updateFileDetails(info, filename, fileId) {
+      document.getElementById(
+        "previewInfo"
+      ).innerHTML = `<i class="fa-solid fa-check-circle"></i> Previewing: ${filename}`;
+
+      const previewDetails = document.getElementById("previewDetails");
+      previewDetails.style.display = "block";
+
+      document.getElementById("detailFilename").textContent =
+        filename || "Unknown";
+      document.getElementById("detailType").textContent =
+        info.content_type || "unknown";
+      document.getElementById("detailFileId").textContent = fileId;
+      document.getElementById("detailUploaded").textContent =
+        new Date().toLocaleString();
+
+      document.getElementById("downloadLink").innerHTML = `
+            <a class="btn" href="/download/${fileId}" target="_blank">
+                <i class="fa-solid fa-download"></i> Download File
+            </a>
+        `;
+    }
+
+    function handlePreviewError(message) {
+      showPreviewError(message);
+    }
+
+    function retryLastPreview() {
+      if (lastPreviewFileId) {
+        const fileSelect = document.getElementById("fileSelect");
+        const selectedOption = fileSelect.options[fileSelect.selectedIndex];
+        const filename = selectedOption ? selectedOption.dataset.filename : "";
+        previewFile(lastPreviewFileId, filename);
+      }
+    }
+
+    // =============================================
+    // UPLOAD FUNCTIONALITY
+    // =============================================
+    function initializeUpload() {
+      const overlay = document.getElementById("loadingOverlay");
+      const loadingText = document.getElementById("loadingText");
+      const uploadArea = document.getElementById("uploadArea");
+      const fileInput = document.getElementById("fileInput");
+      const uploadButton = document.getElementById("uploadButton");
+      const filePreview = document.getElementById("filePreview");
+      const localPreviewContent = document.getElementById(
+        "localPreviewContent"
+      );
+
+      // Upload area click handler
+      if (uploadArea) {
+        uploadArea.addEventListener("click", () => fileInput.click());
+      }
+
+      // File input change handler - LOCAL PREVIEW ONLY
+      if (fileInput) {
+        fileInput.addEventListener("change", function () {
+          const file = fileInput.files[0];
+          if (!file) return;
+
+          if (uploadButton) uploadButton.disabled = false;
+          if (filePreview) filePreview.style.display = "block";
+          if (localPreviewContent) localPreviewContent.innerHTML = "";
+
+          previewLocalFile(file, localPreviewContent);
+        });
+      }
+
+      // Upload button handler
+      if (uploadButton) {
+        uploadButton.addEventListener("click", async function () {
+          const file = fileInput.files[0];
+          if (!file) return;
+
+          overlay.classList.add("active");
+          loadingText.textContent = "Uploading to IPFS...";
+
+          const formData = new FormData();
+          formData.append("file", file);
+
+          try {
+            const { ok, status, json } = await apiJson("/upload", {
+              method: "POST",
+              body: formData,
+            });
+
+            if (!ok) {
+              throw new Error(json?.error || "Upload failed");
+            }
+
+            showUploadSuccess();
+
+            // Reset form and reload files
+            fileInput.value = "";
+            uploadButton.disabled = true;
+            filePreview.style.display = "none";
+            setTimeout(() => window.location.reload(), 2000);
+          } catch (error) {
+            showUploadError(error.message);
+          } finally {
+            overlay.classList.remove("active");
+          }
+        });
+      }
+
+      // Drag and drop functionality
+      if (uploadArea) {
+        uploadArea.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          uploadArea.style.borderColor = "#f9d71c";
+          uploadArea.style.background = "rgba(249, 215, 28, 0.1)";
+        });
+
+        uploadArea.addEventListener("dragleave", () => {
+          uploadArea.style.borderColor = "rgba(249, 215, 28, 0.3)";
+          uploadArea.style.background = "transparent";
+        });
+
+        uploadArea.addEventListener("drop", (e) => {
+          e.preventDefault();
+          uploadArea.style.borderColor = "rgba(249, 215, 28, 0.3)";
+          uploadArea.style.background = "transparent";
+
+          const files = e.dataTransfer.files;
+          if (files.length > 0) {
+            fileInput.files = files;
+            fileInput.dispatchEvent(new Event("change"));
+          }
+        });
+      }
+    }
+
+    // =============================================
+    // DELETE FUNCTIONALITY
+    // =============================================
+    async function deleteFile(fileId, filename) {
+      const { isConfirmed } = await Swal.fire({
+        title: "Delete File?",
+        text: `Are you sure you want to delete "${filename}"? This action cannot be undone.`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#94a0c1",
+        confirmButtonText: "Yes, delete it!",
+        cancelButtonText: "Cancel",
+        background: "#16213e",
+        color: "#fff",
+      });
+
+      if (isConfirmed) {
+        const overlay = document.getElementById("loadingOverlay");
+        const loadingText = document.getElementById("loadingText");
+
+        overlay.classList.add("active");
+        loadingText.textContent = "Deleting file...";
+
+        try {
+          const { ok, status, json } = await apiJson(`/delete/${fileId}`, {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (ok) {
+            Swal.fire({
+              title: "Deleted!",
+              text: "File has been removed from your drive.",
+              icon: "success",
+              background: "#16213e",
+              color: "#fff",
+              confirmButtonColor: "#f9d71c",
+            }).then(() => {
+              window.location.reload();
+            });
+          } else {
+            throw new Error(
+              json?.error || `Delete failed with status ${status}`
+            );
+          }
+        } catch (error) {
+          console.error("Delete error:", error);
+          Swal.fire({
+            title: "Delete Failed",
+            text: error.message,
+            icon: "error",
+            background: "#16213e",
+            color: "#fff",
+            confirmButtonColor: "#f9d71c",
+          });
+        } finally {
+          overlay.classList.remove("active");
+        }
+      }
+    }
+
+    // =============================================
+    // INITIALIZATION
+    // =============================================
+    function initializePreview() {
+      const previewBtn = document.getElementById("previewBtn");
+      const fileSelect = document.getElementById("fileSelect");
+
+      if (previewBtn && fileSelect) {
+        previewBtn.addEventListener("click", () => {
+          const fileId = fileSelect.value;
+          if (!fileId) {
+            Swal.fire({
+              title: "File Required",
+              text: "Please select a file to preview",
+              icon: "warning",
+              background: "#16213e",
+              color: "#fff",
+              confirmButtonColor: "#f9d71c",
+            });
+            return;
+          }
+          const filename =
+            fileSelect.options[fileSelect.selectedIndex].dataset.filename;
+          previewFile(fileId, filename);
+        });
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      initializeUpload();
+      initializePreview();
+      initializeFileTable();
+
+      // Add event listeners for file action buttons
+      document.addEventListener("click", function (e) {
+        // Preview button (IPFS files) - uses file ID only
+        if (e.target.closest(".preview-btn")) {
+          const btn = e.target.closest(".preview-btn");
+          const fileId = btn.dataset.id;
+          const filename = btn.dataset.filename;
+          previewFile(fileId, filename);
+        }
+
+        // Delete button
+        if (e.target.closest(".delete-btn")) {
+          const btn = e.target.closest(".delete-btn");
+          const fileId = btn.dataset.id;
+          const filename = btn.dataset.filename;
+          deleteFile(fileId, filename);
+        }
+      });
+    });
+  </script>
+
+  <style>
+    /* Enhanced File Table Styles */
+    .files-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .file-filters {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      position: relative;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .file-search {
+      width: 100%;
+      padding: 12px 16px 12px 40px;
+      border: 1px solid rgba(249, 215, 28, 0.3);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #e0e6f0;
+      font-size: 0.9rem;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #94a0c1;
+    }
+
+    .file-filter {
+      padding: 12px 16px;
+      border: 1px solid rgba(249, 215, 28, 0.3);
+      border-radius: 8px;
+      background: rgb(43 37 37 / 79%);
+      color: #f9f600;
+      font-size: 0.9rem;
+      min-width: 150px;
+    }
+    .file-search:focus,
+    .file-filter:focus {
+      outline: none;
+      border-color: #f9d71c;
+      box-shadow: 0 0 0 2px rgba(249, 215, 28, 0.2);
+    }
+
+    .files-table-container {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .files-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .files-table th {
+      background: rgba(249, 215, 28, 0.1);
+      padding: 16px;
+      text-align: left;
+      font-weight: 600;
+      color: #f9d71c;
+      font-size: 0.9rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .files-table td {
+      padding: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: #e0e6f0;
+    }
+
+    .files-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .files-table tr:hover {
+      background: rgba(249, 215, 28, 0.05);
+    }
+
+    .file-name-with-icon {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .file-icon-small {
+      color: #f9d71c;
+      font-size: 1.1rem;
+      width: 20px;
+      text-align: center;
+    }
+
+    .file-name-text {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 300px;
+    }
+
+    .file-type-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .file-type-badge.image {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+    .file-type-badge.pdf {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+    .file-type-badge.text {
+      background: rgba(59, 130, 246, 0.2);
+      color: #3b82f6;
+    }
+    .file-type-badge.video {
+      background: rgba(168, 85, 247, 0.2);
+      color: #a855f7;
+    }
+    .file-type-badge.audio {
+      background: rgba(245, 158, 11, 0.2);
+      color: #f59e0b;
+    }
+    .file-type-badge.other {
+      background: rgba(107, 114, 128, 0.2);
+      color: #6b7280;
+    }
+
+    .file-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-btn {
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #94a0c1;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .action-btn:hover {
+      background: rgba(249, 215, 28, 0.2);
+      color: #f9d71c;
+      transform: translateY(-1px);
+    }
+
+    /* Pagination Styles */
+    .pagination-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .pagination-info {
+      color: #94a0c1;
+      font-size: 0.9rem;
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pagination-btn {
+      padding: 8px 16px;
+      border: 1px solid rgba(249, 215, 28, 0.3);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #e0e6f0;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 0.9rem;
+    }
+
+    .pagination-btn:hover:not(:disabled) {
+      background: rgba(249, 215, 28, 0.2);
+      border-color: #f9d71c;
+      color: #f9d71c;
+    }
+
+    .pagination-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .pagination-numbers {
+      display: flex;
+      gap: 5px;
+    }
+
+    .page-number {
+      padding: 8px 12px;
+      border: 1px solid rgba(249, 215, 28, 0.3);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #e0e6f0;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 0.9rem;
+    }
+
+    .page-number:hover {
+      background: rgba(249, 215, 28, 0.2);
+      border-color: #f9d71c;
+      color: #f9d71c;
+    }
+
+    .page-number.current {
+      background: #f9d71c;
+      color: #16213e;
+      border-color: #f9d71c;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .files-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .file-filters {
+        flex-direction: column;
+      }
+
+      .filter-group,
+      .file-filter {
+        min-width: 100%;
+      }
+
+      .files-table {
+        font-size: 0.8rem;
+      }
+
+      .files-table th,
+      .files-table td {
+        padding: 12px 8px;
+      }
+
+      .file-name-text {
+        max-width: 150px;
+      }
+
+      .pagination-container {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+      }
+
+      .file-actions {
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .action-btn {
+        padding: 6px;
+      }
+    }
+
+    /* Existing Preview Styles (keep your existing preview styles) */
+    .preview-placeholder {
+      text-align: center;
+      padding: 60px 20px;
+      color: #94a0c1;
+    }
+
+    .preview-placeholder i {
+      font-size: 4rem;
+      color: #f9d71c;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+
+    .preview-loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: #94a0c1;
+    }
+
+    .loading-spinner {
+      border: 3px solid rgba(249, 215, 28, 0.3);
+      border-top: 3px solid #f9d71c;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    .preview-error {
+      text-align: center;
+      padding: 40px 20px;
+      color: #f87171;
+    }
+
+    .preview-error i {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    .preview-error h4 {
+      color: #f87171;
+      margin-bottom: 0.5rem;
+    }
+
+    .error-actions {
+      margin-top: 1rem;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .file-select-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .file-select {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid rgba(249, 215, 28, 0.3);
+      border-radius: 8px;
+      background: rgb(61 63 93);
+      color: #fef200;
+      font-size: 0.9rem;
+    }
+
+    .file-select:focus {
+      outline: none;
+      border-color: #f9d71c;
+      box-shadow: 0 0 0 2px rgba(249, 215, 28, 0.2);
+    }
+
+    .preview-image-container,
+    .preview-video-container,
+    .preview-audio-container,
+    .preview-pdf-container,
+    .preview-iframe-container,
+    .preview-text-container {
+      position: relative;
+      width: 100%;
+      height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .preview-image {
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 8px;
+      display: block;
+    }
+
+    .preview-video {
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 8px;
+    }
+
+    .preview-audio {
+      width: 80%;
+      margin: 20px 0;
+    }
+
+    .preview-pdf,
+    .preview-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      border-radius: 8px;
+    }
+
+    .preview-text {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 20px;
+      border-radius: 8px;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      font-family: "Courier New", monospace;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      color: #e0e6f0;
+      margin: 0;
+    }
+
+    .image-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #f9d71c;
+      font-size: 0.9rem;
+    }
+
+    .preview-fallback {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: #94a0c1;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 20px;
+      border-radius: 8px;
+      z-index: 10;
+      max-width: 80%;
+    }
+
+    .preview-details {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .preview-details h4 {
+      color: #f9d71c;
+      margin-bottom: 15px;
+      font-size: 1.1rem;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .detail-label {
+      font-size: 0.8rem;
+      color: #94a0c1;
+      font-weight: 600;
+    }
+
+    .detail-value {
+      font-size: 0.9rem;
+      color: #e0e6f0;
+      word-break: break-all;
+    }
+
+    .preview-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #94a0c1;
+      margin-bottom: 15px;
+    }
+
+    .preview-info i {
+      color: #f9d71c;
+    }
+
+    .fa-spinner {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .preview-image-container,
+      .preview-video-container,
+      .preview-pdf-container,
+      .preview-iframe-container,
+      .preview-text-container {
+        height: 300px;
+      }
+
+      .file-select-group {
+        flex-direction: column;
+      }
+
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .preview-audio {
+        width: 95%;
+      }
+
+      .error-actions {
+        flex-direction: column;
+      }
+
+      .error-actions .btn {
+        width: 100%;
+        margin-left: 0 !important;
+      }
+    }
+  </style>
+  {% endblock %}
+</html>
