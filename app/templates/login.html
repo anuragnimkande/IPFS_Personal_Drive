@@ -33,6 +33,7 @@
             name="username"
             placeholder="Enter your username"
             required
+            value="{{ request.form.username if request.form }}"
           />
         </div>
 
@@ -52,6 +53,12 @@
         </button>
       </form>
 
+      <div class="auth-links">
+        <a href="#" id="forgotPasswordLink" class="forgot-password-link">
+          <i class="fa-solid fa-key"></i> Forgot Password?
+        </a>
+      </div>
+
       <div class="auth-actions">
         <a href="/register" class="btn btn-secondary">
           <i class="fa-solid fa-user-plus"></i> Register
@@ -62,5 +69,308 @@
       </div>
     </div>
   </div>
+
+  <!-- Forgot Password Modal -->
+  <div id="forgotPasswordModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-key"></i> Reset Password</h3>
+        <button class="modal-close" id="closeForgotPassword">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Step 1: Enter Username -->
+        <div id="step1" class="forgot-step">
+          <div class="form-group">
+            <label for="forgotUsername">Username</label>
+            <input
+              type="text"
+              id="forgotUsername"
+              placeholder="Enter your username"
+            />
+          </div>
+          <button id="verifyUser" class="btn">
+            <i class="fa-solid fa-shield-check"></i> Continue
+          </button>
+        </div>
+
+        <!-- Step 2: Security Question -->
+        <div id="step2" class="forgot-step" style="display: none">
+          <div class="form-group">
+            <label>Security Question</label>
+            <div id="securityQuestionDisplay" class="security-question">
+              <!-- Question will be inserted here -->
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="securityAnswer">Your Answer</label>
+            <input
+              type="text"
+              id="securityAnswer"
+              placeholder="Enter your answer"
+            />
+          </div>
+          <button id="verifyAnswer" class="btn">
+            <i class="fa-solid fa-check"></i> Verify Answer
+          </button>
+        </div>
+
+        <!-- Step 3: New Password -->
+        <div id="step3" class="forgot-step" style="display: none">
+          <div class="form-group">
+            <label for="newPassword">New Password</label>
+            <input
+              type="password"
+              id="newPassword"
+              placeholder="Enter new password (min. 6 characters)"
+              minlength="6"
+            />
+          </div>
+          <div class="form-group">
+            <label for="confirmPassword">Confirm Password</label>
+            <input
+              type="password"
+              id="confirmPassword"
+              placeholder="Confirm new password"
+              minlength="6"
+            />
+          </div>
+          <button id="resetPassword" class="btn">
+            <i class="fa-solid fa-lock"></i> Reset Password
+          </button>
+        </div>
+
+        <!-- Success Message -->
+        <div id="successMessage" class="success-message" style="display: none">
+          <i class="fa-solid fa-check-circle"></i>
+          <h4>Password Reset Successful!</h4>
+          <p>You can now login with your new password.</p>
+          <button id="goToLogin" class="btn">
+            <i class="fa-solid fa-right-to-bracket"></i> Go to Login
+          </button>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="error-message" style="display: none">
+          <i class="fa-solid fa-exclamation-circle"></i>
+          <span id="errorText"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Forgot Password Modal Functionality
+    const modal = document.getElementById("forgotPasswordModal");
+    const closeBtn = document.getElementById("closeForgotPassword");
+    const forgotPasswordLink = document.getElementById("forgotPasswordLink");
+
+    // Step elements
+    const step1 = document.getElementById("step1");
+    const step2 = document.getElementById("step2");
+    const step3 = document.getElementById("step3");
+    const successMessage = document.getElementById("successMessage");
+    const errorMessage = document.getElementById("errorMessage");
+
+    // Input elements
+    const forgotUsername = document.getElementById("forgotUsername");
+    const securityAnswer = document.getElementById("securityAnswer");
+    const newPassword = document.getElementById("newPassword");
+    const confirmPassword = document.getElementById("confirmPassword");
+
+    // Button elements
+    const verifyUserBtn = document.getElementById("verifyUser");
+    const verifyAnswerBtn = document.getElementById("verifyAnswer");
+    const resetPasswordBtn = document.getElementById("resetPassword");
+    const goToLoginBtn = document.getElementById("goToLogin");
+
+    let currentUsername = "";
+
+    // Open modal when Forgot Password is clicked
+    forgotPasswordLink.addEventListener("click", function (e) {
+      e.preventDefault();
+      modal.style.display = "flex";
+      resetModal();
+    });
+
+    // Close modal
+    closeBtn.addEventListener("click", function () {
+      modal.style.display = "none";
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener("click", function (e) {
+      if (e.target === modal) {
+        modal.style.display = "none";
+      }
+    });
+
+    function resetModal() {
+      step1.style.display = "block";
+      step2.style.display = "none";
+      step3.style.display = "none";
+      successMessage.style.display = "none";
+      errorMessage.style.display = "none";
+
+      forgotUsername.value = "";
+      securityAnswer.value = "";
+      newPassword.value = "";
+      confirmPassword.value = "";
+    }
+
+    function showError(message) {
+      errorMessage.style.display = "block";
+      document.getElementById("errorText").textContent = message;
+    }
+
+    function hideError() {
+      errorMessage.style.display = "none";
+    }
+
+    // Step 1: Verify username and get security question
+    verifyUserBtn.addEventListener("click", async function () {
+      const username = forgotUsername.value.trim();
+
+      if (!username) {
+        showError("Please enter your username");
+        return;
+      }
+
+      verifyUserBtn.disabled = true;
+      verifyUserBtn.innerHTML =
+        '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
+
+      try {
+        const response = await fetch("/forgot-password/verify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ username: username }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          currentUsername = username;
+          document.getElementById("securityQuestionDisplay").textContent =
+            data.security_question;
+          step1.style.display = "none";
+          step2.style.display = "block";
+          hideError();
+        } else {
+          showError(data.error);
+        }
+      } catch (error) {
+        showError("Network error. Please try again.");
+      } finally {
+        verifyUserBtn.disabled = false;
+        verifyUserBtn.innerHTML =
+          '<i class="fa-solid fa-shield-check"></i> Continue';
+      }
+    });
+
+    // Step 2: Verify security answer
+    verifyAnswerBtn.addEventListener("click", function () {
+      const answer = securityAnswer.value.trim();
+
+      if (!answer) {
+        showError("Please enter your security answer");
+        return;
+      }
+
+      step2.style.display = "none";
+      step3.style.display = "block";
+      hideError();
+    });
+
+    // Step 3: Reset password
+    resetPasswordBtn.addEventListener("click", async function () {
+      const password = newPassword.value;
+      const confirm = confirmPassword.value;
+
+      if (!password || !confirm) {
+        showError("Please fill in both password fields");
+        return;
+      }
+
+      if (password !== confirm) {
+        showError("Passwords do not match");
+        return;
+      }
+
+      if (password.length < 6) {
+        showError("Password must be at least 6 characters");
+        return;
+      }
+
+      resetPasswordBtn.disabled = true;
+      resetPasswordBtn.innerHTML =
+        '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
+
+      try {
+        const response = await fetch("/forgot-password/reset", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            username: currentUsername,
+            security_answer: securityAnswer.value.trim(),
+            new_password: password,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          step3.style.display = "none";
+          successMessage.style.display = "block";
+          hideError();
+        } else {
+          showError(data.error);
+          step3.style.display = "none";
+          step2.style.display = "block";
+        }
+      } catch (error) {
+        showError("Network error. Please try again.");
+      } finally {
+        resetPasswordBtn.disabled = false;
+        resetPasswordBtn.innerHTML =
+          '<i class="fa-solid fa-lock"></i> Reset Password';
+      }
+    });
+
+    // Go to login after success
+    goToLoginBtn.addEventListener("click", function () {
+      modal.style.display = "none";
+      window.location.href = "/login";
+    });
+
+    // Allow Enter key to progress through steps
+    forgotUsername.addEventListener("keypress", function (e) {
+      if (e.key === "Enter") {
+        verifyUserBtn.click();
+      }
+    });
+
+    securityAnswer.addEventListener("keypress", function (e) {
+      if (e.key === "Enter") {
+        verifyAnswerBtn.click();
+      }
+    });
+
+    newPassword.addEventListener("keypress", function (e) {
+      if (e.key === "Enter") {
+        resetPasswordBtn.click();
+      }
+    });
+
+    confirmPassword.addEventListener("keypress", function (e) {
+      if (e.key === "Enter") {
+        resetPasswordBtn.click();
+      }
+    });
+  </script>
   {% endblock %}
 </html>
