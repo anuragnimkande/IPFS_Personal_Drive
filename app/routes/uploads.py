@@ -298,3 +298,4 @@ def init_upload_routes(app):
             return jsonify(error=str(e)), 500
         finally:
             db.close()
+        
