@@ -25,7 +25,12 @@
       <input type="file" id="fileInput" />
 
       <div class="file-preview" id="filePreview" style="display: none">
-        <p><strong>Local Preview:</strong></p>
+        <div class="preview-header">
+          <p><strong>Local Preview:</strong></p>
+          <button class="deselect-btn" id="deselectFile" title="Deselect file">
+            <i class="fa-solid fa-times"></i>
+          </button>
+        </div>
         <div class="preview-content" id="localPreviewContent"></div>
       </div>
 
@@ -471,6 +476,40 @@
     }
 
     // =============================================
+    // DESELECT FILE FUNCTIONALITY
+    // =============================================
+    function deselectFile() {
+      console.log("Deselecting file...");
+
+      const fileInput = document.getElementById("fileInput");
+      const uploadButton = document.getElementById("uploadButton");
+      const filePreview = document.getElementById("filePreview");
+      const localPreviewContent = document.getElementById(
+        "localPreviewContent"
+      );
+      const uploadMessage = document.getElementById("uploadMessage");
+
+      // Reset file input
+      fileInput.value = "";
+      currentFile = null;
+
+      // Reset UI state
+      uploadButton.disabled = true;
+      uploadButton.innerHTML =
+        '<i class="fa-solid fa-upload"></i> Upload to IPFS';
+      filePreview.style.display = "none";
+      localPreviewContent.innerHTML = "";
+
+      // Hide any upload messages
+      uploadMessage.style.display = "none";
+
+      // Reset upload state
+      isUploading = false;
+
+      console.log("File deselected successfully");
+    }
+
+    // =============================================
     // LOCAL FILE PREVIEW (Before Upload)
     // =============================================
     function previewLocalFile(file, previewContainer) {
@@ -679,9 +718,21 @@
     }
 
     // =============================================
-    // UPLOAD FUNCTIONALITY
+    // UPLOAD FUNCTIONALITY - FIXED VERSION
     // =============================================
+    let uploadInitialized = false;
+    let isUploading = false;
+    let currentFile = null;
+    let lastFileChange = 0;
+
     function initializeUpload() {
+      // Prevent double initialization
+      if (uploadInitialized) {
+        console.log("Upload already initialized, skipping...");
+        return;
+      }
+      uploadInitialized = true;
+
       const overlay = document.getElementById("loadingOverlay");
       const loadingText = document.getElementById("loadingText");
       const uploadArea = document.getElementById("uploadArea");
@@ -691,66 +742,165 @@
       const localPreviewContent = document.getElementById(
         "localPreviewContent"
       );
+      const deselectButton = document.getElementById("deselectFile");
 
-      // Upload area click handler
-      if (uploadArea) {
-        uploadArea.addEventListener("click", () => fileInput.click());
-      }
+      console.log("Initializing upload functionality...");
 
-      // File input change handler - LOCAL PREVIEW ONLY
-      if (fileInput) {
-        fileInput.addEventListener("change", function () {
-          const file = fileInput.files[0];
-          if (!file) return;
-
-          if (uploadButton) uploadButton.disabled = false;
-          if (filePreview) filePreview.style.display = "block";
-          if (localPreviewContent) localPreviewContent.innerHTML = "";
-
-          previewLocalFile(file, localPreviewContent);
+      // Deselect button handler
+      if (deselectButton) {
+        deselectButton.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          deselectFile();
         });
       }
 
-      // Upload button handler
+      // Upload area click handler - ONLY opens file dialog
+      if (uploadArea) {
+        uploadArea.addEventListener("click", (e) => {
+          // Only trigger file input when clicking on the upload area itself (not children)
+          if (
+            e.target === uploadArea ||
+            e.target.classList.contains("fa-cloud-arrow-up") ||
+            e.target.tagName === "H3" ||
+            e.target.tagName === "P"
+          ) {
+            if (!isUploading) {
+              console.log("Opening file dialog via upload area click");
+              fileInput.click();
+            } else {
+              console.log("Upload in progress, ignoring click");
+            }
+          }
+        });
+      }
+
+      // File input change handler - ONLY shows preview, does NOT upload
+      if (fileInput) {
+        const handleFileInputChange = function (e) {
+          console.log("File input change event triggered");
+          e.preventDefault();
+          e.stopPropagation();
+
+          // Throttle to prevent multiple rapid triggers
+          const now = Date.now();
+          if (now - lastFileChange < 500) {
+            console.log("Throttling file change event");
+            return;
+          }
+          lastFileChange = now;
+
+          if (isUploading) {
+            console.log("Upload in progress, ignoring file change");
+            return;
+          }
+
+          const file = this.files[0];
+          if (!file) {
+            console.log("No file selected");
+            return;
+          }
+
+          console.log(
+            "File selected for preview only:",
+            file.name,
+            "Size:",
+            file.size,
+            "Type:",
+            file.type
+          );
+          currentFile = file;
+          uploadButton.disabled = false;
+          filePreview.style.display = "block";
+          localPreviewContent.innerHTML = "";
+
+          previewLocalFile(file, localPreviewContent);
+        };
+
+        // Remove any existing listener and add new one
+        fileInput.removeEventListener("change", handleFileInputChange);
+        fileInput.addEventListener("change", handleFileInputChange);
+      }
+
+      // Upload button handler - ONLY this triggers the actual upload
       if (uploadButton) {
         uploadButton.addEventListener("click", async function () {
-          const file = fileInput.files[0];
-          if (!file) return;
+          console.log("Upload button clicked");
+
+          if (isUploading) {
+            console.log("Upload already in progress, ignoring click");
+            return;
+          }
+
+          if (!currentFile) {
+            console.log("No file selected for upload");
+            showUploadError("Please select a file first");
+            return;
+          }
+
+          console.log("Starting upload process for:", currentFile.name);
+
+          // Prevent multiple uploads
+          isUploading = true;
+          uploadButton.disabled = true;
+          uploadButton.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
 
           overlay.classList.add("active");
           loadingText.textContent = "Uploading to IPFS...";
 
           const formData = new FormData();
-          formData.append("file", file);
+          formData.append("file", currentFile);
 
           try {
+            console.log("Sending upload request to server...");
             const { ok, status, json } = await apiJson("/upload", {
               method: "POST",
               body: formData,
             });
 
             if (!ok) {
-              throw new Error(json?.error || "Upload failed");
+              throw new Error(
+                json?.error || `Upload failed with status ${status}`
+              );
             }
 
+            console.log("Upload successful, server response:", json);
             showUploadSuccess();
 
-            // Reset form and reload files
+            // Reset everything after successful upload
             fileInput.value = "";
+            currentFile = null;
             uploadButton.disabled = true;
+            uploadButton.innerHTML =
+              '<i class="fa-solid fa-upload"></i> Upload to IPFS';
             filePreview.style.display = "none";
-            setTimeout(() => window.location.reload(), 2000);
+            localPreviewContent.innerHTML = "";
+
+            // Reload page after short delay to show new file
+            setTimeout(() => {
+              console.log("Reloading page to show new file...");
+              window.location.reload();
+            }, 1500);
           } catch (error) {
+            console.error("Upload error:", error);
             showUploadError(error.message);
+
+            // Reset upload state on error
+            isUploading = false;
+            uploadButton.disabled = false;
+            uploadButton.innerHTML =
+              '<i class="fa-solid fa-upload"></i> Upload to IPFS';
           } finally {
             overlay.classList.remove("active");
           }
         });
       }
 
-      // Drag and drop functionality
+      // Drag and drop functionality - ONLY shows preview, does NOT upload
       if (uploadArea) {
         uploadArea.addEventListener("dragover", (e) => {
+          if (isUploading) return;
           e.preventDefault();
           uploadArea.style.borderColor = "#f9d71c";
           uploadArea.style.background = "rgba(249, 215, 28, 0.1)";
@@ -762,17 +912,36 @@
         });
 
         uploadArea.addEventListener("drop", (e) => {
+          if (isUploading) return;
           e.preventDefault();
           uploadArea.style.borderColor = "rgba(249, 215, 28, 0.3)";
           uploadArea.style.background = "transparent";
 
           const files = e.dataTransfer.files;
           if (files.length > 0) {
+            console.log("File dropped for preview:", files[0].name);
+            // Clear previous files and set new one for preview only
+            fileInput.value = "";
             fileInput.files = files;
             fileInput.dispatchEvent(new Event("change"));
           }
         });
       }
+
+      // Prevent file dialog when clicking on preview content
+      if (filePreview) {
+        filePreview.addEventListener("click", (e) => {
+          e.stopPropagation();
+        });
+      }
+
+      if (localPreviewContent) {
+        localPreviewContent.addEventListener("click", (e) => {
+          e.stopPropagation();
+        });
+      }
+
+      console.log("Upload functionality initialized successfully");
     }
 
     // =============================================
@@ -840,6 +1009,37 @@
     }
 
     // =============================================
+    // LOGOUT CONFIRMATION
+    // =============================================
+    function initializeLogoutConfirmation() {
+      const logoutLinks = document.querySelectorAll('a[href*="logout"]');
+
+      logoutLinks.forEach((link) => {
+        link.addEventListener("click", function (e) {
+          e.preventDefault();
+
+          Swal.fire({
+            title: "Logout?",
+            text: "Are you sure you want to log out?",
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonColor: "#f9d71c",
+            cancelButtonColor: "#94a0c1",
+            confirmButtonText: "Yes, Logout",
+            cancelButtonText: "Cancel",
+            background: "#16213e",
+            color: "#fff",
+            reverseButtons: true,
+          }).then((result) => {
+            if (result.isConfirmed) {
+              window.location.href = this.href;
+            }
+          });
+        });
+      });
+    }
+
+    // =============================================
     // INITIALIZATION
     // =============================================
     function initializePreview() {
@@ -868,9 +1068,12 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
+      console.log("DOM loaded, initializing components...");
+
       initializeUpload();
       initializePreview();
       initializeFileTable();
+      initializeLogoutConfirmation();
 
       // Add event listeners for file action buttons
       document.addEventListener("click", function (e) {
@@ -890,6 +1093,8 @@
           deleteFile(fileId, filename);
         }
       });
+
+      console.log("All components initialized successfully");
     });
   </script>
 
@@ -1064,6 +1269,31 @@
       transform: translateY(-1px);
     }
 
+    /* Preview Header with Deselect Button */
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .deselect-btn {
+      padding: 6px 10px;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 6px;
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 0.8rem;
+    }
+
+    .deselect-btn:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: #ef4444;
+      transform: translateY(-1px);
+    }
+
     /* Pagination Styles */
     .pagination-container {
       display: flex;
@@ -1179,9 +1409,19 @@
       .action-btn {
         padding: 6px;
       }
+
+      .preview-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+      }
+
+      .deselect-btn {
+        align-self: flex-end;
+      }
     }
 
-    /* Existing Preview Styles (keep your existing preview styles) */
+    /* Existing Preview Styles */
     .preview-placeholder {
       text-align: center;
       padding: 60px 20px;
